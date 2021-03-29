@@ -11,7 +11,7 @@ bf.set_topology(topology_util.RingGraph(bf.size()))
 torch.manual_seed(12345 * bf.rank())
 
 # Problem Size
-M, N = 15, 10
+M, N = 25, 10
 
 def LossL2(A, b, x):
     # f_i(x) = \frac{1}{2} \|Ax-b\|^2
@@ -39,8 +39,9 @@ def DecenADMMStepL2(A, b, x, a, v, n_i, alpha):
     return next_x, next_a, next_v
 
 def AllreduceGradient(A, b):
-    x = 5*torch.randn(N, 1).to(torch.double)
-    alpha = 0.05
+    x = torch.randn(N, 1).to(torch.double)
+    x = bf.broadcast(x, root_rank=0)  # make everyone starts from same point
+    alpha = 0.01
     loss_records = []
     with torch.no_grad():
         for i in range(500):
@@ -53,7 +54,7 @@ def AllreduceGradient(A, b):
     return x, loss_records
 
 def DecenADMMAlgorithm(A, b):
-    x = 5*torch.randn(N, 1).to(torch.double)
+    x = torch.zeros(N, 1).to(torch.double)
     a = torch.zeros(N, 1).to(torch.double)
     v = torch.zeros(N, 1).to(torch.double)
     alpha = 0.1
