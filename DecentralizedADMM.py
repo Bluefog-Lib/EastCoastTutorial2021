@@ -87,3 +87,4 @@ if __name__ == "__main__":
         plt.plot(loss_records_admm)
         plt.plot(loss_records_ar)
         plt.show()
+    bf.barrier()
