@@ -11,7 +11,8 @@ bf.set_topology(topology_util.RingGraph(bf.size()))
 torch.manual_seed(12345 * bf.rank())
 
 # Problem Size
-M, N = 15, 10
+M, N = 25, 10
+
 
 def LossL2(A, b, x):
     # f_i(x) = \frac{1}{2} \|Ax-b\|^2
@@ -38,12 +39,14 @@ def DecenADMMStepL2(A, b, x, a, v, n_i, alpha):
     next_v = v + next_a - a
     return next_x, next_a, next_v
 
+
 def AllreduceGradient(A, b):
-    x = 5*torch.randn(N, 1).to(torch.double)
-    alpha = 0.05
+    x = torch.zeros(N, 1).to(torch.double)
+    x = bf.broadcast(x, root_rank=0)  # make everyone starts from same point
+    alpha = 0.01
     loss_records = []
     with torch.no_grad():
-        for i in range(500):
+        for i in range(200):
             global_grad = bf.allreduce(GradientL2(A, b, x))
             x = (x - alpha * global_grad).clone()
             loss = bf.allreduce(LossL2(A, b, x))
@@ -52,8 +55,9 @@ def AllreduceGradient(A, b):
         print(f"Allreduce {global_grad}")
     return x, loss_records
 
+
 def DecenADMMAlgorithm(A, b):
-    x = 5*torch.randn(N, 1).to(torch.double)
+    x = torch.zeros(N, 1).to(torch.double)
     a = torch.zeros(N, 1).to(torch.double)
     v = torch.zeros(N, 1).to(torch.double)
     alpha = 0.1
@@ -62,7 +66,7 @@ def DecenADMMAlgorithm(A, b):
     loss_records = [bf.allreduce(LossL2(A, b, x))]
     grad_records = [bf.allreduce(GradientL2(A, b, x))]
     with torch.no_grad():
-        for i in range(100):
+        for i in range(200):
             next_x, next_a, next_v = DecenADMMStepL2(A, b, x, a, v, n_i, alpha)
             x, a, v = next_x.clone(), next_a.clone(), next_v.clone()
 
@@ -78,11 +82,13 @@ if __name__ == "__main__":
     # Random function
     A = torch.randn(M, N).to(torch.double)
     b = torch.rand(M, 1).to(torch.double)
-    
-    x_opt, loss_records_ar = AllreduceGradient(A, b)
+
+    x_ar, loss_records_ar = AllreduceGradient(A, b)
     x_admm, loss_records_admm, grad_records = DecenADMMAlgorithm(A, b)
     if bf.rank() == 0:
-        print(x_opt, x_admm)
-        plt.plot(loss_records_admm)
-        plt.plot(loss_records_ar)
+        print(f"x_ar: {x_ar}, x_admm: {x_admm}")
+        plt.plot(loss_records_admm, label="Decentralized ADMM")
+        plt.plot(loss_records_ar, label="Allreduce Gradient")
+        plt.legend()
         plt.show()
+    bf.barrier()
