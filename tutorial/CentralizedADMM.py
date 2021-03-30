@@ -2,7 +2,9 @@ import os
 
 import bluefog.torch as bf
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
+import scipy.io as sio
 
 # Generate different A and b through different seed.
 bf.init()
@@ -71,21 +73,22 @@ def CentralizedADMMAlgorithm(A, b, x_opt):
     u = torch.zeros(d, 1).to(torch.double)
     alpha = 100
     loss_records = [bf.allreduce(LossL2(A, b, x))]
-    mse_records = [bf.allreduce(torch.norm(x-x_opt))]
+    mse_records = [bf.allreduce(torch.norm(x-x_opt)).item()]
     with torch.no_grad():
         for i in range(100):
             next_x, next_y, next_u = CentralizedADMMStepL2(A, b, x, y, u, alpha)
             x, y, u = next_x.clone(), next_y.clone(), next_u.clone()
 
             loss_records.append(bf.allreduce(LossL2(A, b, y)))
-            mse_records.append(bf.allreduce(torch.norm(x-x_opt)))
+            mse_ = bf.allreduce(torch.norm(x-x_opt))
+            mse_records.append(mse_.item())
 
     global_grad = bf.allreduce(GradientL2(A, b, x))
     print(
         f"[Centralized ADMM] Rank {bf.rank()}: ADMM residue gradient norm: " +
         f"{torch.norm(global_grad) / len(global_grad)}"
     )
-    return x, loss_records, mse_records
+    return x, loss_records, np.array(mse_records)
 
 
 if __name__ == "__main__":
@@ -96,17 +99,8 @@ if __name__ == "__main__":
     x_admm, loss_records_admm, mse_records = CentralizedADMMAlgorithm(A, b, x_ar)
     x_admm_ar = bf.allreduce(x_admm)
     if bf.rank() == 0:
+        sio.savemat('results/CentralizedADMM.mat', {"mse": mse_records})
         print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
         print(f"Last three entries of x_admm:\n {x_admm_ar[-3:]}")
-        plt.semilogy(mse_records, label="Centralized ADMM")
-        plt.title("Centralized ADMM")
-        plt.xlabel("iteration")
-        plt.ylabel("Mean-Square-Error")
-        plt.grid("on")
-        plt.legend()
-        dirname = 'images'
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-        plt.savefig(os.path.join(dirname, 'centralized_admm.png'))
 
     bf.barrier()
