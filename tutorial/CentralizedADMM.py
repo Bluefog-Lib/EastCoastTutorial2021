@@ -56,7 +56,7 @@ def AllreduceGradient(A, b):
     mu = 0.01
     loss_records = []
     with torch.no_grad():
-        for i in range(100):
+        for i in range(500):  # Use more iterations so assume it is optimal.
             global_grad = bf.allreduce(GradientL2(A, b, x))
             x = (x - mu * global_grad).clone()
             loss = bf.allreduce(LossL2(A, b, x))
@@ -64,26 +64,28 @@ def AllreduceGradient(A, b):
     return x, loss_records
 
 
-def CentralizedADMMAlgorithm(A, b):
+def CentralizedADMMAlgorithm(A, b, x_opt):
     d = A.shape[1]
     x = torch.zeros(d, 1).to(torch.double)
     y = torch.zeros(d, 1).to(torch.double)
     u = torch.zeros(d, 1).to(torch.double)
     alpha = 100
     loss_records = [bf.allreduce(LossL2(A, b, x))]
+    mse_records = [bf.allreduce(torch.norm(x-x_opt))]
     with torch.no_grad():
         for i in range(100):
             next_x, next_y, next_u = CentralizedADMMStepL2(A, b, x, y, u, alpha)
             x, y, u = next_x.clone(), next_y.clone(), next_u.clone()
 
             loss_records.append(bf.allreduce(LossL2(A, b, y)))
+            mse_records.append(bf.allreduce(torch.norm(x-x_opt)))
 
     global_grad = bf.allreduce(GradientL2(A, b, x))
     print(
         f"[Centralized ADMM] Rank {bf.rank()}: ADMM residue gradient norm: " +
         f"{torch.norm(global_grad) / len(global_grad)}"
     )
-    return x, loss_records
+    return x, loss_records, mse_records
 
 
 if __name__ == "__main__":
@@ -91,13 +93,16 @@ if __name__ == "__main__":
     A, b = generate_data(m=100, d=50)
 
     x_ar, loss_records_ar = AllreduceGradient(A, b)
-    x_admm, loss_records_admm = CentralizedADMMAlgorithm(A, b)
+    x_admm, loss_records_admm, mse_records = CentralizedADMMAlgorithm(A, b, x_ar)
     x_admm_ar = bf.allreduce(x_admm)
     if bf.rank() == 0:
         print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
         print(f"Last three entries of x_admm:\n {x_admm_ar[-3:]}")
-        plt.plot(loss_records_admm, label="Centralized ADMM")
-        plt.plot(loss_records_ar, label="Allreduce Gradient")
+        plt.semilogy(mse_records, label="Centralized ADMM")
+        plt.title("Centralized ADMM")
+        plt.xlabel("iteration")
+        plt.ylabel("Mean-Square-Error")
+        plt.grid("on")
         plt.legend()
         dirname = 'images'
         if not os.path.exists(dirname):
