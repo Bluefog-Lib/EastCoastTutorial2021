@@ -1,0 +1,7 @@
+bluefog
+ipyparallel
+matplotlib
+notebook
+papermill
+torch
+tqdm
