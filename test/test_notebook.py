@@ -43,7 +43,7 @@ def test_notebooks_against_bluefog(notebook_path):
             out_path,
             log_output=True,
             start_timeout=60,
-            execution_timeout=60,
+            execution_timeout=120,
         )
         print("End papermill")
     except:
