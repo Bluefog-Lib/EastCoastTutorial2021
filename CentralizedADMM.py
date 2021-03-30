@@ -1,13 +1,9 @@
-import numpy as np
 import bluefog.torch as bf
-import torch
-from bluefog.common import topology_util
-import networkx as nx
 import matplotlib.pyplot as plt
+import torch
 
 # Generate different A and b through different seed.
 bf.init()
-bf.set_topology(topology_util.RingGraph(bf.size()))
 torch.manual_seed(12345 * bf.rank())
 
 
@@ -30,7 +26,7 @@ def GradientL2(A, b, x):
     return A.t().mm(A.mm(x) - b)
 
 
-def GradientStepL2(A, b, x, y, u, alpha):
+def ProximalStepL2(A, b, x, y, u, alpha):
     # x^+ = argmin( 0.5*\|Ax-b\|^2 + u^t (x-y) + \alpha/2*\|x-y\|^2)
     #     = {(find x s.t.) A^t(Ax-b) + u + \alpha (x - y) = 0}
     #     = (A^tA + \alpha I)^{-1} (\alpha y + A^tb - u )
@@ -43,7 +39,7 @@ def GradientStepL2(A, b, x, y, u, alpha):
 
 
 def CentralizedADMMStepL2(A, b, x, y, u, alpha):
-    next_x = GradientStepL2(A, b, x, y, u, alpha)
+    next_x = ProximalStepL2(A, b, x, y, u, alpha)
     # We use allreduce to mimic the centralized behavior
     # It should be based on PS architecture and using gather and broadcast.
     next_y = bf.allreduce(next_x)  # Without u is okay since allreudce(u) == 0
