@@ -3,6 +3,8 @@ import bluefog.torch as bf
 import torch
 
 bf.init()
+# Make sure different agent has different random seed.
+torch.manual_seed(12345 * bf.rank())
 
 def generate_data(m, d):
     A = torch.randn(m, d).to(torch.double)
@@ -44,6 +46,7 @@ def distributed_grad_descent(A, b, maxite=5000, alpha=1e-1):
     
     return x_opt
 
-m, d = 20, 5 # dimension of A
-A, b = generate_data(m, d)
-x_opt = distributed_grad_descent(A, b, maxite=200, alpha=1e-2)
+if __name__ == "__main__":
+    m, d = 20, 5 # dimension of A
+    A, b = generate_data(m, d)
+    x_opt = distributed_grad_descent(A, b, maxite=200, alpha=1e-2)

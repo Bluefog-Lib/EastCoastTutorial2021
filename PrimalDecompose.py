@@ -3,6 +3,8 @@ import bluefog.torch as bf
 import torch
 
 bf.init()
+# Make sure different agent has different random seed.
+torch.manual_seed(12345 * bf.rank())
 
 def generate_data(m, d):
     A = torch.randn(m, d).to(torch.double)
@@ -73,6 +75,7 @@ def primal_decomposition(A, B_inv, b, maxite=5000, alpha=1e-1):
     
     return y
 
-m, d = 20, 5 # dimension of A
-A, B_inv, b = generate_data(m, d)
-y = primal_decomposition(A, B_inv, b, maxite=10000, alpha=3e-3)
+if __name__ == "__main__":
+    m, d = 20, 5 # dimension of A
+    A, B_inv, b = generate_data(m, d)
+    y = primal_decomposition(A, B_inv, b, maxite=10000, alpha=3e-3)
