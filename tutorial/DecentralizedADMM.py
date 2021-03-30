@@ -4,6 +4,7 @@ import bluefog.torch as bf
 from bluefog.common import topology_util
 import matplotlib.pyplot as plt
 import torch
+import scipy.io as sio
 
 # Generate different A and b through different seed.
 bf.init()
@@ -99,8 +100,11 @@ if __name__ == "__main__":
     x_admm, loss_records_admm = DecentralizedADMMAlgorithm(A, b)
     x_admm_ar = bf.allreduce(x_admm)
     if bf.rank() == 0:
+        sio.savemat('results/DecentralizedADMM.mat', {"admm": loss_records_admm,
+                                                      "ar": loss_records_ar})
         print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
         print(f"Last three entries of x_admm:\n {x_admm_ar[-3:]}")
+
         plt.plot(loss_records_admm, label="Decentralized ADMM")
         plt.plot(loss_records_ar, label="Allreduce Gradient")
         plt.legend()
