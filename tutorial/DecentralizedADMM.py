@@ -1,3 +1,5 @@
+import os
+
 import bluefog.torch as bf
 from bluefog.common import topology_util
 import matplotlib.pyplot as plt
@@ -57,7 +59,7 @@ def AllreduceGradient(A, b):
     mu = 0.01
     loss_records = []
     with torch.no_grad():
-        for i in range(100):
+        for i in range(200):
             global_grad = bf.allreduce(GradientL2(A, b, x))
             x = (x - mu * global_grad).clone()
             loss = bf.allreduce(LossL2(A, b, x))
@@ -99,9 +101,12 @@ if __name__ == "__main__":
     if bf.rank() == 0:
         print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
         print(f"Last three entries of x_admm:\n {x_admm_ar[-3:]}")
-        # plt.plot(loss_records_admm, label="Decentralized ADMM")
-        # plt.plot(loss_records_ar, label="Allreduce Gradient")
-        # plt.legend()
-        # plt.imsave()
+        plt.plot(loss_records_admm, label="Decentralized ADMM")
+        plt.plot(loss_records_ar, label="Allreduce Gradient")
+        plt.legend()
+        dirname = 'images'
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        plt.savefig(os.path.join(dirname, 'decentralized_admm.png'))
 
     bf.barrier()
