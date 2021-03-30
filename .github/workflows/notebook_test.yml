@@ -1,0 +1,25 @@
+name: Notebook Test
+
+on: [push]
+
+jobs:
+  notebook_test:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+      - name: Install OpenMPI
+        run: |
+          sudo apt-get install -y -q openmpi-bin libopenmpi-dev
+      - name: Install Bluefog
+        run: |
+          git clone https://github.com/Bluefog-Lib/bluefog.git
+          cd bluefog && git submodule update --init --recursive
+          python -m pip install . && cd ..
+      - name: All Notebooks Test
+        run: |
+          python -m pip install -r requirements.txt
+          pytest -s -vv test/test_notebook.py
