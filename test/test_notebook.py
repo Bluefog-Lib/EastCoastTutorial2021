@@ -34,12 +34,13 @@ def test_notebooks_against_bluefog(notebook_path):
     try:
         notebook_file = os.path.basename(notebook_path)
         notebook_rel_dir = os.path.dirname(os.path.relpath(notebook_path, "."))
+        os.chdir(notebook_rel_dir)
         out_path = f".output/{notebook_rel_dir}/{notebook_file[:-6]}.out.ipynb"
         if not os.path.exists(f".output/{notebook_rel_dir}"):
             os.makedirs(f".output/{notebook_rel_dir}")
         print("Start papermill on ", notebook_path)
         pm.execute_notebook(
-            notebook_path,
+            notebook_file,
             out_path,
             log_output=True,
             start_timeout=60,
