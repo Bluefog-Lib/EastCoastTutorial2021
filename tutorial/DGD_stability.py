@@ -24,7 +24,8 @@ def check_opt_cond(x, A, b):
     # the norm of global gradient is expected to be 0 (optimality condition)
     global_grad_norm = torch.norm(grad, p=2)
     if bf.rank() == 0:
-        print("[Distributed Grad Descent] Rank {}: global gradient norm: {}".format(bf.rank(), global_grad_norm))
+        print("[Distributed Grad Descent] Rank {}: global gradient norm: {}".format(
+            bf.rank(), global_grad_norm))
         
     return
 
@@ -85,7 +86,7 @@ if __name__ == "__main__":
     A, b = generate_data(m, d, x_o)
     x_opt = distributed_grad_descent(A, b, maxite=200, alpha=1e-2)
     
-    G = topology_util.ExponentialTwoGraph(bf.size()) # Set topology as exponential-two topology.
+    G = topology_util.ExponentialTwoGraph(bf.size())  # Set topology as exponential-two topology.
     bf.set_topology(G)
 
     maxite = 200
@@ -97,21 +98,22 @@ if __name__ == "__main__":
         if bf.rank() == 0:
             print('\nRunning {}:'.format(method))
     
-        x = torch.zeros(d, 1, dtype=torch.double).to(torch.double)        # Initialize x
+        x = torch.zeros(d, 1, dtype=torch.double).to(torch.double)  # Initialize x
         rel_error = torch.zeros((maxite, 1))
         for ite in range(maxite):
 
             if bf.rank()==0:
                 if ite%100 == 0:
                     print('Progress {}/{}'.format(ite, maxite))
-
+            # you can adjust alpha to different values
             if method == 'ATC':
-                x, rel_error[ite] = ATC_DGD_one_step(x, x_opt, A, b, alpha=alpha) # you can adjust alpha to different values
+                x, rel_error[ite] = ATC_DGD_one_step(x, x_opt, A, b, alpha=alpha)
             else:
-                x, rel_error[ite] = AWC_DGD_one_step(x, x_opt, A, b, alpha=alpha) # you can adjust alpha to different values
+                x, rel_error[ite] = AWC_DGD_one_step(x, x_opt, A, b, alpha=alpha)
                 
         rel_error_dict[method] = rel_error.cpu().detach().numpy().reshape(-1)
         
-if bf.rank() == 0:
-    result_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results', 'DGD_stability.mat')
-    sio.savemat(result_file, rel_error_dict)
+    if bf.rank() == 0:
+        result_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   'results', 'DGD_stability.mat')
+        sio.savemat(result_file, rel_error_dict)

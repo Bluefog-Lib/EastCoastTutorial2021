@@ -54,6 +54,7 @@ for graph in ['Ring', 'Mesh', 'Exp2']:
     rel_err_np = rel_error.cpu().detach().numpy()
     rel_error_dict[graph] = rel_err_np
 
-if bf.rank() == 0:
-    result_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results', 'aveCns.mat')
-    sio.savemat(result_file, rel_error_dict)
+    if bf.rank() == 0:
+        result_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   'results', 'AverageConsensus.mat')
+        sio.savemat(result_file, rel_error_dict)
