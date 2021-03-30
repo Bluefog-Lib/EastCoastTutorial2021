@@ -9,6 +9,7 @@ import papermill as pm
 import pytest
 
 SKIP_NOTEBOOKS = []
+TEST_CWD = os.getcwd()
 
 def _list_all_notebooks():
     output = subprocess.check_output(["git", "ls-files", "*.ipynb"])
@@ -47,5 +48,6 @@ def test_notebooks_against_bluefog(notebook_path):
             execution_timeout=120,
         )
         print("End papermill")
+        os.chdir(TEST_CWD)
     except:
         raise RuntimeError(f"Failed to run {notebook_path}")
