@@ -1,4 +1,5 @@
 
+import os
 import numpy as np
 import bluefog.torch as bf
 import torch
@@ -112,4 +113,5 @@ if __name__ == "__main__":
         rel_error_dict[method] = rel_error.cpu().detach().numpy().reshape(-1)
         
 if bf.rank() == 0:
-    sio.savemat('DGD_limitBias.mat', rel_error_dict)
+    result_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results', 'DGD_limitBias.mat')
+    sio.savemat(result_file, rel_error_dict)
