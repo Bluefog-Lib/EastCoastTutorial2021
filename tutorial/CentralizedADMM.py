@@ -1,3 +1,5 @@
+import os
+
 import bluefog.torch as bf
 import matplotlib.pyplot as plt
 import torch
@@ -94,9 +96,12 @@ if __name__ == "__main__":
     if bf.rank() == 0:
         print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
         print(f"Last three entries of x_admm:\n {x_admm_ar[-3:]}")
-        # plt.plot(loss_records_admm, label="Centralized ADMM")
-        # plt.plot(loss_records_ar, label="Allreduce Gradient")
-        # plt.legend()
-        # plt.imsave()
+        plt.plot(loss_records_admm, label="Centralized ADMM")
+        plt.plot(loss_records_ar, label="Allreduce Gradient")
+        plt.legend()
+        dirname = 'images'
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        plt.savefig(os.path.join(dirname, 'centralized_admm.png'))
 
     bf.barrier()
