@@ -84,7 +84,7 @@ def NonBlocking_AWC_DGD_one_step(x, x_opt, A, b, alpha=1e-2):
     x_handle = bf.neighbor_allreduce_nonblocking(x)
     grad_local = A.t().mm(A.mm(x) - b)                       # compute local grad
 #     time.sleep(0.05)
-    x_new = bf.synchronize(x_handle) - alpha*grad_local      # AWC update
+    x_new = bf.wait(x_handle) - alpha*grad_local             # AWC update
     
     # the relative error: |x^k-x_gloval_average|/|x_gloval_average|
     rel_error = torch.norm(x_new-x_opt, p=2)/torch.norm(x_opt,p=2)
