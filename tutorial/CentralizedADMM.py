@@ -56,7 +56,7 @@ def AllreduceGradient(A, b):
     x = torch.zeros(d, 1).to(torch.double)
     x = bf.broadcast(x, root_rank=0)  # make everyone starts from same point
     mu = 0.01
-    loss_records = []
+    loss_records = [bf.allreduce(LossL2(A, b, x))]
     with torch.no_grad():
         for i in range(500):  # Use more iterations so assume it is optimal.
             global_grad = bf.allreduce(GradientL2(A, b, x))
@@ -73,20 +73,20 @@ def CentralizedADMMAlgorithm(A, b, x_opt):
     u = torch.zeros(d, 1).to(torch.double)
     alpha = 100
     loss_records = [bf.allreduce(LossL2(A, b, x))]
-    mse_records = [bf.allreduce(torch.norm(x-x_opt)).item()]
+    mse_records = [bf.allreduce(torch.norm(x - x_opt)).item()]
     with torch.no_grad():
         for i in range(100):
             next_x, next_y, next_u = CentralizedADMMStepL2(A, b, x, y, u, alpha)
             x, y, u = next_x.clone(), next_y.clone(), next_u.clone()
 
             loss_records.append(bf.allreduce(LossL2(A, b, y)))
-            mse_ = bf.allreduce(torch.norm(x-x_opt))
+            mse_ = bf.allreduce(torch.norm(x - x_opt))
             mse_records.append(mse_.item())
 
     global_grad = bf.allreduce(GradientL2(A, b, x))
     print(
-        f"[Centralized ADMM] Rank {bf.rank()}: ADMM residue gradient norm: " +
-        f"{torch.norm(global_grad) / len(global_grad)}"
+        f"[Centralized ADMM] Rank {bf.rank()}: ADMM residue gradient norm: "
+        + f"{torch.norm(global_grad) / len(global_grad)}"
     )
     return x, loss_records, np.array(mse_records)
 
@@ -97,10 +97,9 @@ if __name__ == "__main__":
 
     x_ar, loss_records_ar = AllreduceGradient(A, b)
     x_admm, loss_records_admm, mse_records = CentralizedADMMAlgorithm(A, b, x_ar)
-    x_admm_ar = bf.allreduce(x_admm)
     if bf.rank() == 0:
-        sio.savemat('results/CentralizedADMM.mat', {"mse": mse_records})
+        sio.savemat("results/CentralizedADMM.mat", {"mse": mse_records})
         print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
-        print(f"Last three entries of x_admm:\n {x_admm_ar[-3:]}")
+        print(f"Last three entries of x_admm:\n {x_admm[-3:]}")
 
     bf.barrier()

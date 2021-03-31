@@ -31,22 +31,19 @@ def GradientL2(A, b, x):
     return A.t().mm(A.mm(x) - b)
 
 
-def ProximalStepL2(A, b, v, n_i, alpha):
-    # x^+ = argmin( 0.5*\|Ax-b\|^2 + \alpha |N_i| /2*\|x-v\|^2)
-    #     = {(find x s.t.) A^t(Ax-b) + \alpha |N_i| v= 0}
-    #     = (A^tA + \alpha I)^{-1} (\alpha |N_i| v)
+def ProximalStepL2(A, b, x, a, v, n_i, alpha):
     m = A.shape[1]
-    AA_inv = (A.t().mm(A) + alpha * n_i * torch.eye(m)).inverse()
-    return AA_inv.mm(A.t().mm(b) + alpha * n_i * v)
+    AA_inv = (A.t().mm(A) + 2 * alpha * n_i * torch.eye(m)).inverse()
+    return AA_inv.mm(A.t().mm(b) + v + alpha * n_i * (x + a))
 
 
 def DecentralizedADMMStepL2(A, b, x, a, v, n_i, alpha):
-    next_x = ProximalStepL2(A, b, v, n_i, alpha)
-    neighbor_weights = {r: 0.5 / n_i for r in bf.in_neighbor_ranks()}
+    next_x = ProximalStepL2(A, b, x, a, v, n_i, alpha)
+    neighbor_weights = {r: 1 / n_i for r in bf.in_neighbor_ranks()}
     next_a = bf.neighbor_allreduce(
-        next_x, self_weight=0.5, neighbor_weights=neighbor_weights
+        next_x, self_weight=0.0, neighbor_weights=neighbor_weights
     )
-    next_v = v + next_a - a
+    next_v = v - alpha * n_i * (next_x - next_a)
     return next_x, next_a, next_v
 
 
@@ -58,17 +55,22 @@ def AllreduceGradient(A, b):
     x = torch.zeros(d, 1).to(torch.double)
     x = bf.broadcast(x, root_rank=0)  # make everyone starts from same point
     mu = 0.01
-    loss_records = []
+    loss_records = [bf.allreduce(LossL2(A, b, x))]
     with torch.no_grad():
-        for i in range(200):
+        for i in range(500):
             global_grad = bf.allreduce(GradientL2(A, b, x))
             x = (x - mu * global_grad).clone()
             loss = bf.allreduce(LossL2(A, b, x))
             loss_records.append(loss)
+    if bf.rank() == 0:
+        print(
+            f"[Decentralized ADMM] Allreduce residue gradient norm: "
+            + f"{torch.norm(global_grad) / len(global_grad)}"
+        )
     return x, loss_records
 
 
-def DecentralizedADMMAlgorithm(A, b):
+def DecentralizedADMMAlgorithm(A, b, x_opt):
     d = A.shape[1]
     x = torch.zeros(d, 1).to(torch.double)
     a = torch.zeros(d, 1).to(torch.double)
@@ -77,19 +79,22 @@ def DecentralizedADMMAlgorithm(A, b):
     n_i = len(bf.in_neighbor_ranks())
 
     loss_records = [bf.allreduce(LossL2(A, b, x))]
+    mse_records = [bf.allreduce(torch.norm(x - x_opt)).item()]
     with torch.no_grad():
         for i in range(200):
             next_x, next_a, next_v = DecentralizedADMMStepL2(A, b, x, a, v, n_i, alpha)
             x, a, v = next_x.clone(), next_a.clone(), next_v.clone()
 
             loss_records.append(bf.allreduce(LossL2(A, b, x)))
+            mse_ = bf.allreduce(torch.norm(x - x_opt))
+            mse_records.append(mse_.item())
 
     global_grad = bf.allreduce(GradientL2(A, b, x))
     print(
-        f"[Decentralized ADMM] Rank {bf.rank()}: ADMM residue gradient norm: " +
-        f"{torch.norm(global_grad) / len(global_grad)}"
+        f"[Decentralized ADMM] Rank {bf.rank()}: ADMM residue gradient norm: "
+        + f"{torch.norm(global_grad) / len(global_grad)}"
     )
-    return x, loss_records
+    return x, loss_records, mse_records
 
 
 if __name__ == "__main__":
@@ -97,20 +102,20 @@ if __name__ == "__main__":
     A, b = generate_data(m=100, d=50)
 
     x_ar, loss_records_ar = AllreduceGradient(A, b)
-    x_admm, loss_records_admm = DecentralizedADMMAlgorithm(A, b)
-    x_admm_ar = bf.allreduce(x_admm)
-    if bf.rank() == 0:
-        sio.savemat('results/DecentralizedADMM.mat', {"admm": loss_records_admm,
-                                                      "ar": loss_records_ar})
-        print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
-        print(f"Last three entries of x_admm:\n {x_admm_ar[-3:]}")
+    x_admm, loss_records_admm, mse_records = DecentralizedADMMAlgorithm(A, b, x_ar)
 
-        plt.plot(loss_records_admm, label="Decentralized ADMM")
-        plt.plot(loss_records_ar, label="Allreduce Gradient")
-        plt.legend()
-        dirname = 'images'
+    if bf.rank() == 0:
+        sio.savemat("results/DecentralizedADMM.mat", {"mse": mse_records})
+        print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
+        print(f"Last three entries of x_admm:\n {x_admm[-3:]}")
+
+        # plt.plot(loss_records_admm, label="Decentralized ADMM")
+        # plt.plot(loss_records_ar, label="Allreduce Gradient")
+        # plt.legend()
+        plt.semilogy(mse_records)
+        dirname = "images"
         if not os.path.exists(dirname):
             os.makedirs(dirname)
-        plt.savefig(os.path.join(dirname, 'decentralized_admm.png'))
+        plt.savefig(os.path.join(dirname, "decentralized_admm.png"))
 
     bf.barrier()
