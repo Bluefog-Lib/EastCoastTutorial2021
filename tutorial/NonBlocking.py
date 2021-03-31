@@ -95,32 +95,32 @@ if __name__ == "__main__":
     
     torch.manual_seed(12345 * bf.rank())
     
-    m, d = 20, 2000 # dimension of A
+    m, d = 1000, 1000 # dimension of A (small dimension case cannot observe the improvement )
     x_o = torch.rand(d,1).to(torch.double)
     x_o = bf.broadcast(x_o, root_rank = 0)
     A, b = generate_data(m, d, x_o)
-    x_opt = distributed_grad_descent(A, b, maxite=200, alpha=1e-2)
+    x_opt = distributed_grad_descent(A, b, maxite=1500, alpha=1e-4)
     
     G = topology_util.ExponentialTwoGraph(bf.size())  # Set topology as exponential-two topology.
     bf.set_topology(G)
 
-    maxite = 3000
-    alpha = 5e-3
+    maxite = 1000
+    alpha = 5e-5
     rel_error_dict = {}
     
     for method in ['ATC', 'AWC', 'NBK-AWC']:
-        
-        start = time.time()
-        
         if bf.rank() == 0:
             print('\nRunning {}:'.format(method))
     
         x = torch.zeros(d, 1, dtype=torch.double).to(torch.double)  # Initialize x
         rel_error = torch.zeros((maxite, 1))
+        time_list = []
+
+        start = time.time()
         for ite in range(maxite):
 
             if bf.rank()==0:
-                if ite%500 == 0:
+                if ite%200 == 0:
                     print('Progress {}/{}'.format(ite, maxite))
 
             # you can adjust alpha to different values
@@ -129,9 +129,11 @@ if __name__ == "__main__":
             elif method == 'NBK-AWC':
                 x, rel_error[ite] = NonBlocking_AWC_DGD_one_step(x, x_opt, A, b, alpha=alpha)
             else:
-                AWC_DGD_one_step(x, x_opt, A, b, alpha=alpha)
+                x, rel_error[ite] = AWC_DGD_one_step(x, x_opt, A, b, alpha=alpha)
+            time_list.append(time.time() - start)
                 
-        rel_error_dict[method] = rel_error.cpu().detach().numpy().reshape(-1)
+        rel_error_dict[method] = rel_error.numpy().reshape(-1)
+        rel_error_dict[method+"_time"] = np.asarray(time_list)
         
         end = time.time()
         
