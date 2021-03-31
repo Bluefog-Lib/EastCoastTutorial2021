@@ -1,8 +1,8 @@
 import os
 
+import numpy as np
 import bluefog.torch as bf
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 import scipy.io as sio
 

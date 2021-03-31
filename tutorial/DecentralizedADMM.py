@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import bluefog.torch as bf
 from bluefog.common import topology_util
 import matplotlib.pyplot as plt
@@ -32,9 +33,13 @@ def GradientL2(A, b, x):
 
 
 def ProximalStepL2(A, b, x, a, v, n_i, alpha):
+    # x^+ = argmin( 0.5*\|Ax-b\|^2 + \alpha |N_i| /2*\|x-v\|^2)
+    #     = {(find x s.t.) A^t(Ax-b) + \alpha |N_i| (x-v)= 0}
+    #     = {(find x s.t.) (A^t A+ \alpha |N_i| I ) x -A^t b - \alpha |N_i| v= 0}
+    #     = (A^tA + \alpha |N_i| I)^{-1} (\alpha |N_i| v + A^t b)
     m = A.shape[1]
-    AA_inv = (A.t().mm(A) + 2 * alpha * n_i * torch.eye(m)).inverse()
-    return AA_inv.mm(A.t().mm(b) + v + alpha * n_i * (x + a))
+    AA_inv = (A.t().mm(A) + alpha * n_i * torch.eye(m)).inverse()
+    return AA_inv.mm(A.t().mm(b) + alpha * n_i * v)
 
 
 def DecentralizedADMMStepL2(A, b, x, a, v, n_i, alpha):
@@ -43,7 +48,7 @@ def DecentralizedADMMStepL2(A, b, x, a, v, n_i, alpha):
     next_a = bf.neighbor_allreduce(
         next_x, self_weight=0.0, neighbor_weights=neighbor_weights
     )
-    next_v = v - alpha * n_i * (next_x - next_a)
+    next_v = v + next_a - (x + a) / 2
     return next_x, next_a, next_v
 
 
@@ -108,14 +113,5 @@ if __name__ == "__main__":
         sio.savemat("results/DecentralizedADMM.mat", {"mse": mse_records})
         print(f"Last three entries of x_ar:\n {x_ar[-3:]}")
         print(f"Last three entries of x_admm:\n {x_admm[-3:]}")
-
-        # plt.plot(loss_records_admm, label="Decentralized ADMM")
-        # plt.plot(loss_records_ar, label="Allreduce Gradient")
-        # plt.legend()
-        plt.semilogy(mse_records)
-        dirname = "images"
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-        plt.savefig(os.path.join(dirname, "decentralized_admm.png"))
 
     bf.barrier()
