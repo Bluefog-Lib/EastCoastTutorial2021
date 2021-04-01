@@ -1,4 +1,6 @@
 # EastCoastTutorial2021
+[![Notebook Test](https://github.com/Bluefog-Lib/EastCoastTutorial2021/actions/workflows/notebook_test.yml/badge.svg)](https://github.com/Bluefog-Lib/EastCoastTutorial2021/actions/workflows/notebook_test.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 The main tutorials are in the following two jupyter notebooks under the tutorial directory.
 
