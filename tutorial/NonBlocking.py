@@ -94,8 +94,10 @@ def NonBlocking_AWC_DGD_one_step(x, x_opt, A, b, alpha=1e-2):
 if __name__ == "__main__":
     
     torch.manual_seed(12345 * bf.rank())
-    
-    m, d = 1000, 1000 # dimension of A (small dimension case cannot observe the improvement )
+    if os.getenv("TEST_ENV"):
+        m, d = 100, 100
+    else:
+        m, d = 1000, 1000 # dimension of A (small dimension case cannot observe the improvement )
     x_o = torch.rand(d,1).to(torch.double)
     x_o = bf.broadcast(x_o, root_rank = 0)
     A, b = generate_data(m, d, x_o)
