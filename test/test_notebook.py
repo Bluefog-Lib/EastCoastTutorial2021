@@ -32,6 +32,7 @@ def _tested_notebooks():
 
 @pytest.mark.parametrize("notebook_path", _list_all_notebooks())
 def test_notebooks_against_bluefog(notebook_path):
+    os.environ["TEST_ENV"] = "1"
     try:
         notebook_file = os.path.basename(notebook_path)
         notebook_rel_dir = os.path.dirname(os.path.relpath(notebook_path, "."))
