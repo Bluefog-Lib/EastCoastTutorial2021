@@ -44,9 +44,9 @@ def ProximalStepL2(A, b, x, a, v, n_i, alpha):
 
 def DecentralizedADMMStepL2(A, b, x, a, v, n_i, alpha):
     next_x = ProximalStepL2(A, b, x, a, v, n_i, alpha)
-    neighbor_weights = {r: 1 / n_i for r in bf.in_neighbor_ranks()}
+    src_weights = {r: 1 / n_i for r in bf.in_neighbor_ranks()}
     next_a = bf.neighbor_allreduce(
-        next_x, self_weight=0.0, neighbor_weights=neighbor_weights
+        next_x, self_weight=0.0, src_weights=src_weights
     )
     next_v = v + next_a - (x + a) / 2
     return next_x, next_a, next_v
