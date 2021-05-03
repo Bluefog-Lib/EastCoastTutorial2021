@@ -77,5 +77,6 @@ def primal_decomposition(A, B_inv, b, maxite=5000, alpha=1e-1):
 
 if __name__ == "__main__":
     m, d = 20, 5 # dimension of A
+    maxite = 5000 if os.getenv("TEST_ENV") else 100
     A, B_inv, b = generate_data(m, d)
-    y = primal_decomposition(A, B_inv, b, maxite=5000, alpha=3e-3)
+    y = primal_decomposition(A, B_inv, b, maxite=maxite, alpha=3e-3)
